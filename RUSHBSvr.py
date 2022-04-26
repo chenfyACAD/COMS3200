@@ -11,6 +11,18 @@ FLAGS = {"GET": "0010000", "DAT": "0001000", "FIN": "0000100", "DAT_ACK": "10010
          "FIN_ACK_CHK": "1000110", "DAT_NAK_CHK": "0101010"}
 
 
+class Session:
+    def __init__(self, port, sequence_num, server_sequence_num, required_file, required_flag, checksum):
+        self.port = port
+        self.sequence_num = sequence_num
+        self.server_sequence_num = server_sequence_num
+        self.required_file = required_file
+        self.payload = self.required_file[:MAX_PAYLOAD_SIZE]
+        self.required_flag = required_flag
+        self.checksum = checksum
+        self.time = 0
+
+
 class Server:
     def __init__(self):
         self.server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -50,10 +62,23 @@ class Server:
                         continue
                     if flag == FLAGS["GET_CHK"] and checksum != compute_checksum(package[8:]):
                         continue
-                    try:
-                        self.start_new_session(port, flag, payload)
-                    except IOError:
-                        continue
+                    if flag == FLAGS["GET"]:
+                        try:
+                            file = load_file(payload)
+                        except IOError:
+                            continue
+                        current_session = Session(port, 1, 1, file, [FLAGS["DAT_ACK"], FLAGS["DAT_NAK"]], False)
+                        self.sessions.append(current_session)
+                        self.send_packet(current_session, 0, FLAGS["DAT"])
+                    elif flag == FLAGS["GET_CHK"]:
+                        try:
+                            file = load_file(payload)
+                        except IOError:
+                            continue
+                        current_session = Session(port, 1, 1, file, [FLAGS["DAT_ACK_CHK"], FLAGS["DAT_NAK_CHK"]], True)
+                        self.sessions.append(current_session)
+                        self.send_checksum_packet(current_session, 0, FLAGS["DAT_CHK"])
+
                 else:
                     continue
 
@@ -111,18 +136,6 @@ class Server:
             else:
                 continue
 
-    def start_new_session(self, port, flag, payload):
-        if flag == FLAGS["GET"]:
-            file = load_file(payload)
-            current_session = Session(port, 1, 1, file, [FLAGS["DAT_ACK"], FLAGS["DAT_NAK"]], False)
-            self.sessions.append(current_session)
-            self.send_packet(current_session, 0, FLAGS["DAT"])
-        elif flag == FLAGS["GET_CHK"]:
-            file = load_file(payload)
-            current_session = Session(port, 1, 1, file, [FLAGS["DAT_ACK_CHK"], FLAGS["DAT_NAK_CHK"]], True)
-            self.sessions.append(current_session)
-            self.send_checksum_packet(current_session, 0, FLAGS["DAT_CHK"])
-
     def send_packet(self, session, ack_num, flag):
         packet = build_package(session.server_sequence_num, ack_num, 0, flag, session.payload)
         self.server.sendto(packet, session.port)
@@ -151,18 +164,6 @@ class Server:
             else:
                 self.send_packet(session, 0, FLAGS["FIN"])
         return
-
-
-class Session:
-    def __init__(self, port, sequence_num, server_sequence_num, required_file, required_flag, checksum):
-        self.port = port
-        self.sequence_num = sequence_num
-        self.server_sequence_num = server_sequence_num
-        self.required_file = required_file
-        self.payload = self.required_file[:MAX_PAYLOAD_SIZE]
-        self.required_flag = required_flag
-        self.checksum = checksum
-        self.time = 0
 
 
 def load_file(payload):
