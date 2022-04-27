@@ -33,8 +33,8 @@ class Server:
 
     def run(self):
         print(self.server.getsockname()[1])
-        # multiple-clients handling
         while True:
+            # multiple-clients handling
             for session in self.sessions:
                 if time.time() - session.time > 4:
                     self.resend_packet(session)
