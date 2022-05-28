@@ -32,7 +32,7 @@ class Server:
         self.sessions = []
 
     def run(self):
-        print(self.server.getsockname()[1])
+        print(self.server.getsockname()[1], flush=True)
         while True:
             # multiple-clients handling
             for session in self.sessions:
