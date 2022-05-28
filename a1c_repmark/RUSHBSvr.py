@@ -58,10 +58,8 @@ class Server:
                 if session.port == port:
                     current_session = session
 
-            print(2)
             # start a new session
             if current_session is None:
-                print(1)
                 if sequence_num == 1 and ack_num == 0:
                     if flag == FLAGS["GET"] and checksum == 0:
                         try:
